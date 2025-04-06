@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Beach Reservation PoC - Villasimius</title>
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+
+    <link rel="icon" type="image/svg+xml" href='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%230077cc%22/%3E%3C/svg%3E'>
+
+    <style>
+      :root {
+        --primary-color: #0077cc;
+        --secondary-color: #f0f8ff;
+        --text-color: #333;
+        --light-text: #fff;
+        --border-color: #ddd;
+        --error-color: #d9534f;
+        --map-height: 300px; /* Adjust map height for mobile */
+        /* Availability Colors */
+        --availability-high-color: #28a745; /* Green */
+        --availability-medium-color: #ffc107; /* Yellow/Orange */
+        --availability-low-color: #ff8400; /* Orange */
+        --availability-zero-color: #6c757d; /* Grey */
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: var(--secondary-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        overscroll-behavior: none; /* Prevent pull-to-refresh interference with map */
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 0 auto; /* Remove top margin for map edge-to-edge feel */
+        padding: 0 1rem 1rem 1rem; /* No top padding initially */
+        background-color: #fff;
+        /* Removed box-shadow and border-radius initially for map */
+      }
+      .content-padding {
+        padding: 1rem; /* Add padding back for non-map content */
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-top: 1rem; /* Space between map/header and content */
+      }
+
+      header {
+        text-align: center;
+        padding: 1rem;
+        background-color: #fff; /* Give header a background */
+        border-bottom: 1px solid var(--border-color);
+        /* Add back shadow if desired
+             box-shadow: 0 2px 4px rgba(0,0,0,0.05); */
+      }
+
+      h1 {
+        color: var(--primary-color);
+        margin: 0;
+        font-size: 1.5em;
+      }
+
+      h2 {
+        color: var(--primary-color);
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+        font-size: 1.2em;
+        padding-top: 0.5rem; /* Add padding when inside content-padding */
+        border-top: 1px solid var(--border-color); /* Separator */
+        margin-top: 1rem;
+      }
+      .content-padding h2:first-child {
+        border-top: none; /* No border for the first heading in a section */
+        margin-top: 0;
+        padding-top: 0;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.3rem;
+        font-weight: bold;
+      }
+
+      input[type="date"],
+      input[type="number"],
+      input[type="text"],
+      input[type="email"],
+      select {
+        width: 100%;
+        padding: 0.8rem;
+        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        box-sizing: border-box;
+        font-size: 1rem;
+      }
+
+      button {
+        display: block;
+        width: 100%;
+        padding: 0.8rem 1rem;
+        background-color: var(--primary-color);
+        color: var(--light-text);
+        border: none;
+        border-radius: 4px;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        margin-top: 1rem;
+      }
+      button:disabled {
+        background-color: #a0cfee;
+        cursor: not-allowed;
+      }
+
+      button:hover:not(:disabled),
+      button:focus:not(:disabled) {
+        background-color: #005fa3;
+        outline: none;
+      }
+
+      button.secondary {
+        background-color: #6c757d;
+        margin-top: 0.5rem;
+      }
+      button.secondary:hover:not(:disabled),
+      button.secondary:focus:not(:disabled) {
+        background-color: #5a6268;
+      }
+
+      .availability-info,
+      .booking-confirmation,
+      .registration-form {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background-color: var(--secondary-color);
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+      }
+
+      .availability-info strong,
+      .booking-confirmation strong {
+        color: var(--primary-color);
+      }
+
+      /* Enhanced Availability Display */
+      .availability-display {
+        text-align: center;
+        margin: 0.5rem 0;
+        font-size: 1.1em;
+      }
+      .spots-available-value {
+        font-size: 1.75em; /* Make spots number prominent */
+        font-weight: bold;
+        display: inline-block; /* Keep on same line as text */
+        margin: 0 0.25em; /* Space around number */
+      }
+      .spots-total-value {
+        font-size: 0.9em;
+        color: #666;
+      }
+
+      /* Availability Color Classes */
+      .availability-high {
+        color: var(--availability-high-color);
+      }
+      .availability-medium {
+        color: var(--availability-medium-color);
+      }
+      .availability-low {
+        color: var(--availability-low-color);
+      }
+      .availability-zero {
+        color: var(--availability-zero-color);
+        font-style: italic;
+      }
+
+      #qrcode {
+        margin: 1.5rem auto 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 200px;
+        height: 200px;
+        padding: 10px;
+        background-color: white;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+      }
+      #qrcode img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+      #qrcode p {
+        /* Message inside QR code box */
+        text-align: center;
+        color: #888;
+      }
+
+      .error-message {
+        color: var(--error-color);
+        background-color: #fdd;
+        border: 1px solid var(--error-color);
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+        border-radius: 4px;
+        text-align: center;
+      }
+
+      [x-cloak] {
+        display: none !important;
+      }
+
+      .text-center {
+        text-align: center;
+      }
+      .mt-1 {
+        margin-top: 1rem;
+      }
+      .mb-1 {
+        margin-bottom: 1rem;
+      }
+      .bold {
+        font-weight: bold;
+      }
+
+      /* Map Styles */
+      #map {
+        height: var(--map-height);
+        width: 100%; /* Take full width */
+        border-bottom: 1px solid var(--border-color);
+        background-color: #eee; /* Placeholder background */
+      }
+      .leaflet-popup-content-wrapper {
+        border-radius: 4px;
+      }
+      .leaflet-popup-content {
+        font-size: 0.9rem;
+        line-height: 1.4;
+        margin: 10px !important; /* Override default tighter margin */
+      }
+      .leaflet-popup-content button {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+      }
+      /* Highlight selected beach in dropdown/info */
+      .selected-beach-info {
+        padding: 0.5rem;
+        background-color: var(--primary-color);
+        color: var(--light-text);
+        border-radius: 4px;
+        text-align: center;
+        margin-bottom: 1rem;
+        font-weight: bold;
+      }
+
+      /* Style Popup and Tooltip Content */
+      .leaflet-popup-content p,
+      .leaflet-tooltip p {
+        margin: 0.3em 0; /* Tighter spacing inside popup/tooltip */
+      }
+      .popup-availability strong,
+      .tooltip-availability strong {
+        font-size: 1.1em;
+      }
+      /* Style the select options (limited cross-browser support) */
+      select option.availability-high {
+        color: var(--availability-high-color);
+      }
+      select option.availability-medium {
+        color: var(--availability-medium-color);
+      } /* May not work everywhere */
+      select option.availability-low {
+        color: var(--availability-low-color);
+      } /* May not work everywhere */
+      select option.availability-zero {
+        color: var(--availability-zero-color);
+      } /* May not work everywhere */
+
+      @media (min-width: 768px) {
+        :root {
+          --map-height: 400px; /* Taller map on desktop */
+        }
+        .container {
+          padding: 0 2rem 2rem 2rem;
+          margin: 1rem auto; /* Add top margin back */
+          border-radius: 8px; /* Add radius back */
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Add shadow back */
+        }
+        .content-padding {
+          padding: 1.5rem;
+          margin-top: 0; /* No margin needed inside container */
+          box-shadow: none; /* Remove inner shadow */
+        }
+        header {
+          border-radius: 8px 8px 0 0; /* Round top corners */
+        }
+        #map {
+          /* No specific changes needed, already full width */
+        }
+      }
+    </style>
+    <!-- AlpineJS via CDN (ESM) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "alpinejs": "https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js"
+        }
+      }
+    </script>
+    <script type="module">
+      import Alpine from "alpinejs";
+      window.Alpine = Alpine;
+      Alpine.start();
+    </script>
+    <!-- QRCode.js via CDN (Global) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <!-- Leaflet JS -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+  </head>
+  <body x-data="beachApp()" x-cloak>
+    <header>
+      <h1>Villasimius Beach Reservations</h1>
+      <!-- Display current date being viewed for availability -->
+      <p style="margin: 0; font-size: 0.9em; color: #555">
+        Showing availability for:
+        <strong x-text="formattedDate(selectedDate)"></strong>
+      </p>
+    </header>
+
+    <!-- Map Container -->
+    <div id="map" x-init="initializeMap()"></div>
+
+    <div class="container">
+      <main class="content-padding">
+        <!-- Add padding wrapper -->
+
+        <!-- === SECTION 1: Selection (Date + Fallback Dropdown) === -->
+        <section x-show="currentView === 'selection'" x-transition>
+          <h2>Select Beach & Date</h2>
+
+          <!-- Display selected beach from map or dropdown -->
+          <div x-show="selectedBeachId" class="selected-beach-info mb-1">
+            Selected: <span x-text="getSelectedBeachName()"></span>
+            <!-- Show availability for selected beach here too -->
+            <template x-if="getAvailabilityInfo(selectedBeachId)">
+              <span
+                :class="getAvailabilityClass(getAvailabilityInfo(selectedBeachId).currentAvailableSpots, getAvailabilityInfo(selectedBeachId).totalSpots)"
+              >
+                (<span
+                  x-text="getAvailabilityInfo(selectedBeachId).currentAvailableSpots === null ? '...' : getAvailabilityInfo(selectedBeachId).currentAvailableSpots"
+                ></span
+                >/<span
+                  x-text="getAvailabilityInfo(selectedBeachId).totalSpots"
+                ></span>
+                available)
+              </span>
+            </template>
+          </div>
+
+          <div>
+            <label for="date">Select Date:</label>
+            <!-- Watch for date changes to update availabilities -->
+            <input
+              type="date"
+              id="date"
+              x-model="selectedDate"
+              :min="todayDate()"
+            />
+          </div>
+
+          <div>
+            <label for="beach-select">Or Choose from List:</label>
+            <select id="beach-select" x-model="selectedBeachId">
+              <option value="">-- Select a Beach --</option>
+              <template x-for="beach in beaches" :key="beach.id">
+                <!-- Attempt to style option - may not work, but text helps -->
+                <option
+                  :value="beach.id"
+                  :class="getAvailabilityClass(beach.currentAvailableSpots, beach.totalSpots)"
+                  x-text="`${beach.name} (${beach.currentAvailableSpots === null ? '...' : beach.currentAvailableSpots}/${beach.totalSpots})`"
+                ></option>
+              </template>
+            </select>
+          </div>
+
+          <button
+            @click="checkAvailability()"
+            :disabled="!selectedBeachId || !selectedDate || getAvailabilityInfo(selectedBeachId)?.currentAvailableSpots === null"
+          >
+            Check Specific Availability & Proceed
+          </button>
+
+          <div
+            x-show="errorMessage"
+            class="error-message mt-1"
+            x-text="errorMessage"
+          ></div>
+        </section>
+
+        <!-- === SECTION 2: Availability & Booking === -->
+        <section x-show="currentView === 'booking'" x-transition>
+          <h2>Book Your Spot</h2>
+
+          <div class="availability-info">
+            <p>Beach: <strong x-text="getSelectedBeachName()"></strong></p>
+            <p>Date: <strong x-text="formattedDate(selectedDate)"></strong></p>
+            <div class="availability-display" x-show="availableSpots !== null">
+              Available Spots:
+              <span
+                :class="getAvailabilityClass(availableSpots, getSelectedBeachTotalSpots())"
+              >
+                <strong
+                  class="spots-available-value"
+                  x-text="availableSpots"
+                ></strong>
+              </span>
+              <span class="spots-total-value">
+                /
+                <span x-text="getSelectedBeachTotalSpots()"></span> Total</span
+              >
+            </div>
+            <div class="availability-display" x-show="availableSpots === null">
+              Checking availability...
+            </div>
+          </div>
+
+          <div x-show="availableSpots !== null && availableSpots > 0">
+            <label for="spots"
+              >Number of Spots (1 -
+              <span x-text="availableSpots"></span>):</label
+            >
+            <input
+              type="number"
+              id="spots"
+              x-model.number="spotsToBook"
+              min="1"
+              :max="availableSpots"
+              required
+            />
+            <button
+              @click="proceedToRegistration()"
+              :disabled="!spotsToBook || spotsToBook <= 0 || spotsToBook > availableSpots"
+            >
+              Enter Details to Book
+            </button>
+          </div>
+          <div
+            x-show="availableSpots !== null && availableSpots <= 0"
+            class="text-center mt-1 availability-zero"
+          >
+            <p>Sorry, no spots available for this date.</p>
+          </div>
+
+          <button @click="resetToSelection()" class="secondary">
+            Change Selection
+          </button>
+
+          <div
+            x-show="errorMessage"
+            class="error-message mt-1"
+            x-text="errorMessage"
+          ></div>
+        </section>
+
+        <!-- === SECTION 3: Registration === -->
+        <section x-show="currentView === 'registration'" x-transition>
+          <h2>Your Details</h2>
+          <div class="registration-form">
+            <p class="mb-1">
+              <span class="bold">Booking for:</span>
+              <span x-text="getSelectedBeachName()"></span> on
+              <span x-text="formattedDate(selectedDate)"></span> (<span
+                x-text="spotsToBook"
+              ></span>
+              spot<span x-text="spotsToBook > 1 ? 's' : ''"></span>)
+            </p>
+            <div>
+              <label for="name">Full Name:</label>
+              <input
+                type="text"
+                id="name"
+                x-model="userName"
+                placeholder="Mario Rossi"
+                required
+              />
+            </div>
+            <div>
+              <label for="email">Email:</label>
+              <input
+                type="email"
+                id="email"
+                x-model="userEmail"
+                placeholder="mario.rossi@email.com"
+                required
+              />
+            </div>
+            <p style="font-size: 0.8rem; color: #555">
+              (Note: This is a PoC, your details are not saved or sent.)
+            </p>
+
+            <button
+              @click="confirmRegistrationAndBook()"
+              :disabled="!userName || !userEmail"
+            >
+              Confirm Booking & Get QR Code
+            </button>
+          </div>
+          <button @click="currentView = 'booking'" class="secondary">
+            Back to Spot Selection
+          </button>
+          <div
+            x-show="errorMessage"
+            class="error-message mt-1"
+            x-text="errorMessage"
+          ></div>
+        </section>
+
+        <!-- === SECTION 4: Confirmation === -->
+        <section x-show="currentView === 'confirmation'" x-transition>
+          <h2>Booking Confirmed!</h2>
+
+          <div class="booking-confirmation">
+            <p>Your reservation details:</p>
+            <ul>
+              <li>Name: <strong x-text="bookingDetails?.userName"></strong></li>
+              <li>
+                Email: <strong x-text="bookingDetails?.userEmail"></strong>
+              </li>
+              <li>
+                Beach: <strong x-text="bookingDetails?.beachName"></strong>
+              </li>
+              <li>
+                Date:
+                <strong x-text="formattedDate(bookingDetails?.date)"></strong>
+              </li>
+              <li>Spots: <strong x-text="bookingDetails?.spots"></strong></li>
+              <li>Booking ID: <strong x-text="bookingDetails?.id"></strong></li>
+            </ul>
+            <p class="text-center mt-1 bold">Show this QR code upon arrival:</p>
+          </div>
+
+          <!-- QR Code Placeholder -->
+          <div id="qrcode"><p>Generating QR Code...</p></div>
+
+          <button
+            @click="downloadQrCode()"
+            class="mt-1 secondary"
+            :disabled="!qrCodeGenerated"
+          >
+            Download QR Code
+          </button>
+          <button @click="resetView()" class="mt-1">
+            Make Another Reservation
+          </button>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      function beachApp() {
+        return {
+          // --- State ---
+          beaches: [
+            // Added totalSpots and placeholder for current availability
+            {
+              id: "bch1",
+              name: "Porto Giunco",
+              lat: 39.1146,
+              lng: 9.5205,
+              totalSpots: 500,
+              currentAvailableSpots: null,
+            },
+            {
+              id: "bch2",
+              name: "Simius Playa",
+              lat: 39.1287,
+              lng: 9.527,
+              totalSpots: 450,
+              currentAvailableSpots: null,
+            }, // Slightly different total
+            {
+              id: "bch3",
+              name: "Campulongu",
+              lat: 39.1305,
+              lng: 9.5048,
+              totalSpots: 300,
+              currentAvailableSpots: null,
+            },
+            {
+              id: "bch4",
+              name: "Punta Molentis",
+              lat: 39.1377,
+              lng: 9.5546,
+              totalSpots: 150,
+              currentAvailableSpots: null,
+            }, // Smaller capacity
+            {
+              id: "bch5",
+              name: "Spiaggia del Riso",
+              lat: 39.1215,
+              lng: 9.5089,
+              totalSpots: 200,
+              currentAvailableSpots: null,
+            },
+          ],
+          selectedBeachId: "",
+          selectedDate: "",
+          availableSpots: null, // Specific availability for the selected beach/date combo in booking view
+          spotsToBook: 1,
+          userName: "",
+          userEmail: "",
+          bookingDetails: null,
+          currentView: "selection", // 'selection', 'booking', 'registration', 'confirmation'
+          errorMessage: "",
+          mapInstance: null,
+          mapMarkers: {}, // Store Leaflet markers by beach ID
+          qrCodeInstance: null,
+          qrCodeGenerated: false,
+
+          // --- Initialization ---
+          init() {
+            this.selectedDate = this.todayDate();
+            console.log("Beach App Initializing...");
+            // Map is initialized via x-init
+            // Watch for date changes to update availabilities
+            this.$watch("selectedDate", (newDate, oldDate) => {
+              if (newDate && newDate !== oldDate) {
+                console.log(
+                  `Date changed to: ${newDate}. Updating all availabilities.`
+                );
+                this.updateAllBeachAvailabilities(newDate);
+              }
+            });
+            console.log("Alpine component initialized.");
+          },
+
+          // --- Map Methods ---
+          initializeMap() {
+            const villasimiusCoords = [39.13, 9.52]; // Center of Villasimius area
+            const mapBounds = L.latLngBounds([
+              [39.1, 9.48], // Approx SW corner
+              [39.16, 9.57], // Approx NE corner
+            ]);
+
+            this.mapInstance = L.map("map", {
+              center: villasimiusCoords,
+              zoom: 13,
+              // maxBounds: mapBounds, // Restrict panning area
+              minZoom: 12,
+              maxZoom: 16,
+              zoomControl: true, // Keep zoom control
+            });
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              maxZoom: 18, // Allow zooming in further than map restriction
+              attribution:
+                '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            }).addTo(this.mapInstance);
+
+            // Add markers for each beach - will be updated with availability later
+            this.beaches.forEach((beach) => {
+              const marker = L.marker([beach.lat, beach.lng]).addTo(
+                this.mapInstance
+              );
+              // Set initial popup/tooltip content - will be updated
+              marker.bindPopup(this.getPopupContent(beach));
+              marker.bindTooltip(this.getTooltipContent(beach), {
+                sticky: true,
+              }); // Show on hover
+
+              this.mapMarkers[beach.id] = marker;
+
+              // Handle popup button click
+              marker.on("popupopen", (e) => {
+                const currentBeachId = e.target.options.beachId; // Get beachId stored on marker
+                this.$nextTick(() => {
+                  // Ensure button is in DOM after popup opens
+                  const btn = document.querySelector(
+                    `.select-beach-map-btn[data-beach-id="${currentBeachId}"]`
+                  );
+                  if (btn) {
+                    btn.onclick = () => {
+                      // Use onclick for simplicity here
+                      console.log(
+                        `Beach selected from map popup: ${
+                          this.getAvailabilityInfo(currentBeachId)?.name
+                        }`
+                      );
+                      this.selectedBeachId = currentBeachId;
+                      this.mapInstance.closePopup();
+                      // Optional: scroll to selection area if needed on mobile
+                      // document.getElementById('beach-select')?.scrollIntoView({ behavior: 'smooth' });
+                    };
+                  }
+                });
+              });
+              // Store beachId on the marker itself for easy retrieval in event handlers
+              marker.options.beachId = beach.id;
+            });
+
+            // Add a simple boundary indication (rectangle)
+            L.rectangle(mapBounds, {
+              color: "#ff7800",
+              weight: 1,
+              fill: false,
+              dashArray: "5, 5",
+            }).addTo(this.mapInstance);
+
+            // Calculate initial availabilities for today *after* map is ready
+            this.$nextTick(() => {
+              console.log(
+                "Map initialized, calculating initial availabilities..."
+              );
+              this.updateAllBeachAvailabilities(this.selectedDate);
+            });
+
+            console.log("Map Initialized");
+
+            // Handle potential resize issues if map initialized while hidden/resized
+            setTimeout(() => {
+              if (this.mapInstance) this.mapInstance.invalidateSize();
+            }, 300);
+
+            // Workaround for potential touch/drag issues on mobile map inside scrollable body
+            const mapEl = document.getElementById("map");
+            if (mapEl) {
+              mapEl.addEventListener("touchstart", (e) => {
+                // Allow map dragging only if the touch starts on the map itself, not controls
+                if (e.target.closest(".leaflet-control")) return;
+                if (this.mapInstance) this.mapInstance.dragging.enable();
+              });
+              // Optionally disable dragging on touch end if it causes issues, but often not needed
+              // mapEl.addEventListener('touchend', () => { if(this.mapInstance) this.mapInstance.dragging.disable(); });
+            }
+          },
+
+          // --- Availability Calculation & Display ---
+          calculateAvailabilityFor(beachId, date) {
+            const beach = this.getAvailabilityInfo(beachId);
+            if (!beach) return 0;
+
+            // Simulate fetching data - use date and beach ID for pseudo-randomness
+            const seed = date.replace(/-/g, "") + beachId;
+            let hash = 0;
+            for (let i = 0; i < seed.length; i++) {
+              hash = (hash << 5) - hash + seed.charCodeAt(i);
+              hash |= 0; // Convert to 32bit integer
+            }
+            // Generate a number between 0 and totalSpots
+            const randomSpots = Math.abs(hash % (beach.totalSpots + 1));
+            return randomSpots;
+          },
+
+          updateAllBeachAvailabilities(date) {
+            console.log(
+              `Updating availabilities for all beaches for date: ${date}`
+            );
+            this.beaches.forEach((b) => {
+              // Use a different variable name in loop if needed
+              const available = this.calculateAvailabilityFor(b.id, date);
+              // Find the specific beach in the reactive 'beaches' array and update it
+              const beachIndex = this.beaches.findIndex(
+                (beachItem) => beachItem.id === b.id
+              );
+              if (beachIndex !== -1) {
+                this.beaches[beachIndex].currentAvailableSpots = available;
+
+                // Update map marker popup and tooltip for this beach
+                const marker = this.mapMarkers[b.id];
+                if (marker) {
+                  const updatedBeachData = this.beaches[beachIndex]; // Use the updated data
+                  marker.setPopupContent(
+                    this.getPopupContent(updatedBeachData)
+                  );
+                  marker.setTooltipContent(
+                    this.getTooltipContent(updatedBeachData)
+                  );
+                }
+              } else {
+                console.warn(
+                  `Beach with id ${b.id} not found in reactive array during update.`
+                );
+              }
+            });
+            // Alpine should react automatically to changes in the 'beaches' array
+            console.log("Availabilities updated");
+          },
+
+          getAvailabilityInfo(beachId) {
+            return this.beaches.find((b) => b.id === beachId);
+          },
+
+          getSelectedBeachTotalSpots() {
+            const beach = this.getAvailabilityInfo(this.selectedBeachId);
+            return beach ? beach.totalSpots : 0;
+          },
+
+          getAvailabilityClass(available, total) {
+            if (available === null || total === null || total === 0)
+              return "availability-zero"; // Treat null as zero/loading
+            if (available <= 0) return "availability-zero";
+            const percentage = (available / total) * 100;
+            if (percentage < 15) return "availability-low"; // Red
+            if (percentage < 50) return "availability-medium"; // Yellow
+            return "availability-high"; // Green
+          },
+
+          // --- Map Content Helpers ---
+          getPopupContent(beach) {
+            const available = beach.currentAvailableSpots;
+            const total = beach.totalSpots;
+            const availabilityClass = this.getAvailabilityClass(
+              available,
+              total
+            );
+            const availabilityText =
+              available === null
+                ? "Loading..."
+                : `<strong class="${availabilityClass}">${available}</strong> / ${total} Available`;
+
+            return `
+                        <div>
+                            <p><strong style="font-size: 1.1em;">${
+                              beach.name
+                            }</strong></p>
+                            <p class="popup-availability">${availabilityText}</p>
+                            ${
+                              available !== null && available > 0
+                                ? `<button class="select-beach-map-btn" data-beach-id="${beach.id}">Select this Beach</button>`
+                                : ""
+                            }
+                            ${
+                              available === 0
+                                ? "<p><em>No spots available</em></p>"
+                                : ""
+                            }
+                             ${
+                               available === null
+                                 ? "<p><em>Checking date...</em></p>"
+                                 : ""
+                             }
+                        </div>
+                    `;
+          },
+
+          getTooltipContent(beach) {
+            const available = beach.currentAvailableSpots;
+            const total = beach.totalSpots;
+            const availabilityClass = this.getAvailabilityClass(
+              available,
+              total
+            );
+            const availabilityText =
+              available === null
+                ? "..."
+                : `<strong class="${availabilityClass}">${available}</strong>/${total}`;
+            return `<span class="tooltip-availability">${beach.name}: ${availabilityText}</span>`;
+          },
+
+          // --- State Management & Actions ---
+          checkAvailability() {
+            // Primarily moves to booking view, confirms pre-calculated value
+            this.errorMessage = "";
+            const beachInfo = this.getAvailabilityInfo(this.selectedBeachId);
+
+            if (!beachInfo || !this.selectedDate) {
+              this.errorMessage = "Please select both a beach and a date.";
+              return;
+            }
+
+            // The availability should already be calculated and stored
+            this.availableSpots = beachInfo.currentAvailableSpots;
+
+            if (this.availableSpots === null) {
+              // This indicates an issue, perhaps recalculate as fallback
+              console.warn(
+                "Availability check clicked but spots were null. Check logic."
+              );
+              this.errorMessage =
+                "Availability data not ready. Please try again shortly.";
+              // Optionally trigger recalculation:
+              // this.availableSpots = this.calculateAvailabilityFor(this.selectedBeachId, this.selectedDate);
+              // const beachIndex = this.beaches.findIndex(b => b.id === this.selectedBeachId);
+              // if(beachIndex !== -1) this.beaches[beachIndex].currentAvailableSpots = this.availableSpots;
+              return; // Don't proceed if null
+            }
+
+            console.log(
+              `Proceeding to book for ${this.getSelectedBeachName()} on ${
+                this.selectedDate
+              }. Confirmed Spots: ${this.availableSpots}`
+            );
+            this.spotsToBook = 1; // Reset spots to book when checking availability
+            this.currentView = "booking";
+          },
+
+          proceedToRegistration() {
+            this.errorMessage = "";
+            if (!this.spotsToBook || this.spotsToBook <= 0) {
+              this.errorMessage = "Please enter a valid number of spots.";
+              return;
+            }
+            if (this.spotsToBook > this.availableSpots) {
+              this.errorMessage = `Only ${this.availableSpots} spots available. Please book fewer spots.`;
+              return;
+            }
+            this.currentView = "registration";
+          },
+
+          confirmRegistrationAndBook() {
+            this.errorMessage = "";
+            if (!this.userName || !this.userEmail) {
+              this.errorMessage = "Please enter both your name and email.";
+              return;
+            }
+            if (!/^\S+@\S+\.\S+$/.test(this.userEmail)) {
+              this.errorMessage = "Please enter a valid email address.";
+              return;
+            }
+
+            // Simulate successful booking
+            this.bookingDetails = {
+              id: `BK-${Date.now().toString().slice(-6)}`,
+              beachId: this.selectedBeachId,
+              beachName: this.getSelectedBeachName(),
+              date: this.selectedDate,
+              spots: this.spotsToBook,
+              userName: this.userName,
+              userEmail: this.userEmail,
+            };
+
+            console.log("Booking details prepared:", this.bookingDetails);
+            this.currentView = "confirmation";
+            this.qrCodeGenerated = false;
+
+            this.$nextTick(() => {
+              this.generateQrCode();
+            });
+          },
+
+          generateQrCode() {
+            const qrElement = document.getElementById("qrcode");
+            if (!qrElement) {
+              console.error("QR Code element not found");
+              return;
+            }
+            qrElement.innerHTML = "<p>Generating QR Code...</p>";
+            this.qrCodeGenerated = false;
+
+            if (this.bookingDetails) {
+              const qrData = JSON.stringify({
+                id: this.bookingDetails.id,
+                beach: this.bookingDetails.beachName,
+                date: this.bookingDetails.date,
+                spots: this.bookingDetails.spots,
+                name: this.bookingDetails.userName,
+              });
+
+              if (typeof QRCode !== "undefined") {
+                try {
+                  qrElement.innerHTML = ""; // Clear before creating
+                  this.qrCodeInstance = new QRCode(qrElement, {
+                    text: qrData,
+                    width: 180,
+                    height: 180,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H,
+                  });
+                  console.log("QR Code generated for:", qrData);
+                  this.qrCodeGenerated = true;
+                } catch (e) {
+                  console.error("Error generating QR Code:", e);
+                  qrElement.innerHTML = "<p>Error generating QR code.</p>";
+                  this.errorMessage = "Could not generate QR code.";
+                }
+              } else {
+                console.error("QRCode library is not loaded.");
+                qrElement.innerHTML = "<p>QR Code library failed to load.</p>";
+                this.errorMessage = "QR Code library failed to load.";
+              }
+            } else {
+              qrElement.innerHTML = "<p>No booking details found.</p>";
+            }
+          },
+
+          downloadQrCode() {
+            if (!this.qrCodeGenerated || !this.qrCodeInstance) return;
+
+            const qrElement = document.getElementById("qrcode");
+            const qrImage = qrElement.querySelector("img");
+            const qrCanvas = qrElement.querySelector("canvas");
+
+            let dataUrl = null;
+
+            if (qrImage && qrImage.src.startsWith("data:image")) {
+              dataUrl = qrImage.src;
+            } else if (qrCanvas) {
+              try {
+                dataUrl = qrCanvas.toDataURL("image/png");
+              } catch (e) {
+                console.error(
+                  "Could not get data URL from canvas (tainted?):",
+                  e
+                );
+                this.errorMessage =
+                  "Could not generate downloadable QR code image.";
+                return;
+              }
+            } else {
+              console.error(
+                "Could not find QR code image or canvas to download."
+              );
+              this.errorMessage = "Could not find QR code image to download.";
+              return;
+            }
+
+            if (dataUrl) {
+              const link = document.createElement("a");
+              link.download = `beach-reservation-${
+                this.bookingDetails?.id || "qrcode"
+              }.png`;
+              link.href = dataUrl;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              console.log("QR Code download initiated.");
+            }
+          },
+
+          resetToSelection() {
+            this.availableSpots = null; // Clear specific booking availability
+            this.spotsToBook = 1;
+            this.errorMessage = "";
+            this.currentView = "selection";
+            // Keep selectedBeachId and selectedDate
+          },
+
+          resetView() {
+            // Full reset for a new reservation
+            this.selectedBeachId = "";
+            this.selectedDate = this.todayDate(); // Reset date to today
+            this.availableSpots = null;
+            this.spotsToBook = 1;
+            this.userName = "";
+            this.userEmail = "";
+            this.bookingDetails = null;
+            this.errorMessage = "";
+            this.qrCodeGenerated = false;
+            this.currentView = "selection";
+
+            const qrElement = document.getElementById("qrcode");
+            if (qrElement) qrElement.innerHTML = "";
+            this.qrCodeInstance = null;
+
+            // Recalculate availabilities for the new 'today' date
+            this.updateAllBeachAvailabilities(this.selectedDate);
+
+            console.log("View Reset for new reservation");
+          },
+
+          todayDate() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, "0");
+            const day = String(today.getDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+          },
+
+          formattedDate(dateString) {
+            if (!dateString) return "N/A";
+            // Ensure date is parsed as local time, not UTC, by avoiding hyphens if possible or adding time
+            try {
+              const date = new Date(dateString + "T00:00:00"); // Add time to suggest local
+              if (isNaN(date.getTime())) throw new Error("Invalid date"); // Check if date is valid
+              return date.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                timeZone: "Europe/Rome",
+              }); // Explicit timezone for consistency
+            } catch (e) {
+              console.error("Error formatting date:", dateString, e);
+              return dateString; // Fallback
+            }
+          },
+
+          getSelectedBeachName() {
+            const beach = this.beaches.find(
+              (b) => b.id === this.selectedBeachId
+            );
+            return beach ? beach.name : "N/A";
+          },
+        };
+      }
+    </script>
+  </body>
+</html>
